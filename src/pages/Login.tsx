@@ -1,4 +1,5 @@
-// src/pages/Login.tsx (e repita para Home.tsx e Callback.tsx)
+import { useState, useEffect } from 'react'
+
 export default function Login() {
   const [loading, setLoading] = useState(false)
   const [visible, setVisible] = useState(false)
