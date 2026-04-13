@@ -10,6 +10,14 @@ const SCOPES = [
 
 const VERIFIER_KEY = 'vs_pkce_verifier'
 
+const KEYS = {
+  access: 'vs_access_token',
+  refresh: 'vs_refresh_token',
+  expiry: 'vs_token_expiry',
+}
+
+// ── PKCE helpers ────────────────────────────────────────────────────────────
+
 function generateCodeVerifier(): string {
   const array = new Uint8Array(48) // 48 bytes → 64 base64url chars
   crypto.getRandomValues(array)
@@ -29,6 +37,27 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
     .replace(/=+$/, '')
 }
 
+// ── Token storage ────────────────────────────────────────────────────────────
+
+function saveTokens(data: { access_token: string; refresh_token?: string; expires_in: number }) {
+  localStorage.setItem(KEYS.access, data.access_token)
+  if (data.refresh_token) {
+    localStorage.setItem(KEYS.refresh, data.refresh_token)
+  }
+  localStorage.setItem(KEYS.expiry, String(Date.now() + data.expires_in * 1000))
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+export function isAuthenticated(): boolean {
+  return !!localStorage.getItem(KEYS.access)
+}
+
+export function logout(): void {
+  Object.values(KEYS).forEach((k) => localStorage.removeItem(k))
+  window.location.href = '/login'
+}
+
 export async function redirectToSpotifyAuth(): Promise<void> {
   const verifier = generateCodeVerifier()
   const challenge = await generateCodeChallenge(verifier)
@@ -46,7 +75,7 @@ export async function redirectToSpotifyAuth(): Promise<void> {
   window.location.href = `https://accounts.spotify.com/authorize?${params}`
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<string> {
+export async function exchangeCodeForTokens(code: string): Promise<void> {
   const verifier = sessionStorage.getItem(VERIFIER_KEY)
   if (!verifier) throw new Error('Missing PKCE verifier — please try signing in again.')
 
@@ -64,10 +93,43 @@ export async function exchangeCodeForTokens(code: string): Promise<string> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.error_description ?? 'Token exchange failed')
+    throw new Error((err as { error_description?: string }).error_description ?? 'Token exchange failed')
   }
 
   const data = await res.json()
   sessionStorage.removeItem(VERIFIER_KEY)
-  return data.access_token as string
+  saveTokens(data as { access_token: string; refresh_token?: string; expires_in: number })
+}
+
+export async function getValidToken(): Promise<string> {
+  const access = localStorage.getItem(KEYS.access)
+  const expiry = Number(localStorage.getItem(KEYS.expiry) ?? 0)
+
+  if (access && Date.now() < expiry) return access
+
+  // Token expired — try to refresh
+  const refresh = localStorage.getItem(KEYS.refresh)
+  if (!refresh) {
+    logout()
+    throw new Error('No refresh token available.')
+  }
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID,
+      grant_type: 'refresh_token',
+      refresh_token: refresh,
+    }),
+  })
+
+  if (!res.ok) {
+    logout()
+    throw new Error('Session expired. Please sign in again.')
+  }
+
+  const data = await res.json()
+  saveTokens(data as { access_token: string; refresh_token?: string; expires_in: number })
+  return (data as { access_token: string }).access_token
 }
