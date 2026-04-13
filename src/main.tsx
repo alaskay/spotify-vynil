@@ -8,6 +8,7 @@ import '@/styles/globals.css'
 import Login from '@/pages/Login'
 import Callback from '@/pages/Callback'
 import Home from '@/pages/Home'
+import ProtectedRoute from '@/components/ProtectedRoute'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -15,7 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/callback" element={<Callback />} />
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

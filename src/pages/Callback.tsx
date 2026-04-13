@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { exchangeCodeForTokens } from '@/services/spotify-auth'
-import { useAppStore } from '@/store/useAppStore'
 
 type Status = 'loading' | 'error'
 
 export default function Callback() {
   const navigate = useNavigate()
-  const setToken = useAppStore((s) => s.setToken)
   const [status, setStatus] = useState<Status>('loading')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -23,8 +21,7 @@ export default function Callback() {
     }
 
     exchangeCodeForTokens(code)
-      .then((token) => {
-        setToken(token)
+      .then(() => {
         navigate('/', { replace: true })
       })
       .catch((err: Error) => {
