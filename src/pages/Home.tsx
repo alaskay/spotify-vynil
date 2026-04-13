@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Home as HomeIcon, Search, Library, Settings, LogOut, Plus, User } from 'lucide-react'
 import { logout } from '@/services/spotify-auth'
+import { fetchCurrentUser } from '@/services/spotify-api'
+import { useAppStore } from '@/store/useAppStore'
 
 const NAV_ITEMS = [
   { name: 'My Shelf',  icon: HomeIcon },
@@ -11,6 +13,18 @@ const NAV_ITEMS = [
 
 export default function Home() {
   const [activeNav, setActiveNav] = useState<string>('My Shelf')
+  const spotifyUser = useAppStore((s) => s.spotifyUser)
+  const setSpotifyUser = useAppStore((s) => s.setSpotifyUser)
+
+  useEffect(() => {
+    if (!spotifyUser) {
+      fetchCurrentUser().then(setSpotifyUser).catch(() => undefined)
+    }
+  }, [spotifyUser, setSpotifyUser])
+
+  const avatarUrl = spotifyUser?.images?.[0]?.url
+  const displayName = spotifyUser?.display_name ?? '…'
+  const handle = spotifyUser ? `@${spotifyUser.id}` : ''
 
   return (
     <div
@@ -46,17 +60,20 @@ export default function Home() {
         <div className="p-6 pb-8">
           <div className="flex items-center gap-3 mb-6">
             <div
-              className="rounded-full flex items-center justify-center flex-shrink-0"
+              className="rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center"
               style={{ width: '48px', height: '48px', backgroundColor: '#FF4D8F' }}
             >
-              <User size={24} color="#F0EEF5" />
+              {avatarUrl
+                ? <img src={avatarUrl} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <User size={24} color="#F0EEF5" />
+              }
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-base truncate" style={{ color: '#F0EEF5' }}>
-                VinylShelf
+                {displayName}
               </div>
               <div className="text-sm truncate" style={{ color: '#6B6880' }}>
-                @vinylshelf
+                {handle}
               </div>
             </div>
           </div>
@@ -111,7 +128,7 @@ export default function Home() {
               color: '#F0EEF5',
             }}
           >
-            Welcome back
+            Welcome back{spotifyUser ? `, ${displayName.split(' ')[0]}` : ''}
           </h1>
           <p className="text-sm" style={{ color: '#6B6880' }}>
             Your vinyl shelf is waiting
